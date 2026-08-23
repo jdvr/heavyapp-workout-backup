@@ -25,6 +25,9 @@ fun Application.configureHttp() {
         header("X-Engine", "Ktor") // will send this header with each response
     }
     routing {
+        get("/") {
+            call.respondText("heavyapp-workout-parser")
+        }
         openAPI(path = "openapi") {
             /*
              Documentation source configuration goes here.

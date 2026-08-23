@@ -1,53 +1,130 @@
 # heavyapp-workout-parser
 
-This project was created using the [Ktor Project Generator](https://start.ktor.io).
+A Hevy-compatible workout API that serves data from a CSV export file.
 
-Here are some useful links to get you started:
+## Overview
 
-* [Ktor Documentation](https://ktor.io/docs/home.html)
-* [Ktor GitHub page](https://github.com/ktorio/ktor)
-* [Ktor Slack chat](https://app.slack.com/client/T09229ZC6/C0A974TJ9). [Request an invite](https://surveys.jetbrains.com/s3/kotlin-slack-sign-up).
+- **Stack:** Kotlin Multiplatform + Ktor 3.5.x (JVM), Gradle Kotlin DSL, JVM 21 toolchain.
+- **Modules:**
+  - `:core` — shared, platform-neutral domain models and `DataSource` interfaces.
+  - `:client` — Ktor client (multiplatform).
+  - `:server` — Ktor server: CSV source implementation and the `/v1` API.
 
-## Features
+## API
 
-Here's a list of features included in this project:
+The server mirrors Hevy's public API where it makes sense — no `api-key` header,
+no pagination:
 
-| Name                                                                                            | Description                                                                                             |
-|-------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| [CORS](https://start.ktor.io/p/io.ktor/server-cors)                                             | Enables Cross-Origin Resource Sharing (CORS)                                                            |
-| [Compression](https://start.ktor.io/p/io.ktor/server-compression)                               | Compresses responses using encoding algorithms like GZIP                                                |
-| [Default Headers](https://start.ktor.io/p/io.ktor/server-default-headers)                       | Adds a default set of headers to HTTP responses                                                         |
-| [OpenAPI](https://start.ktor.io/p/io.ktor/server-openapi)                                       | Serves OpenAPI documentation                                                                            |
-| [Swagger](https://start.ktor.io/p/io.ktor/server-swagger)                                       | Serves Swagger UI for your project                                                                      |
-| [Resources](https://start.ktor.io/p/io.ktor/server-resources)                                   | Provides type-safe routing                                                                              |
-| [OpenTelemetry](https://start.ktor.io/p/io.opentelemetry.instrumentation/server-open-telemetry) | Instruments applications with distributed tracing, metrics, and logging for comprehensive observability |
-| [Content Negotiation](https://start.ktor.io/p/io.ktor/server-content-negotiation)               | Provides automatic content conversion according to Content-Type and Accept headers                      |
-| [kotlinx.serialization](https://start.ktor.io/p/io.ktor/server-kotlinx-serialization)           | Handles JSON serialization using kotlinx.serialization library                                          |
+| Endpoint | Status | Description |
+|---|---|---|
+| `GET /v1/workouts` | 200 | All workouts, newest first |
+| `GET /v1/workouts/count` | 200 | Total workout count |
+| `GET /v1/workouts/{id}` | 200/404 | Single workout by ID |
+| `GET /v1/workouts/events?since=<ISO 8601>` | 200 | Workouts updated since the given timestamp (`updated` events only; deletions are never emitted) |
+| `GET /v1/exercise_history/{templateId}` | 200 | Set-level history for an exercise template, optional `start_date`/`end_date` |
+| `GET /v1/routines`, `/v1/routine_folders`, `/v1/exercise_templates`, `/v1/body_measurements`, `/v1/user/info` | **503** | Domains whose data sources are not wired yet |
 
-## Structure
+Write operations (`POST`/`PUT`) are not supported and respond `501`.
 
-This project includes the following modules:
+## Data source
 
-| Path   | Description |
-|--------|-------------|
-|        | null        |
-| client | null        |
-| core   | null        |
-| server | null        |
+Workouts come from a CSV file in Hevy's export format (see `example.csv`). The
+file is loaded at startup and reloaded every 60 seconds; edits to the file show up
+as new events on `/v1/workouts/events`. A failed reload keeps the last good snapshot.
+
+Configure the file path via (in order of preference):
+
+```bash
+# environment variable
+HEAVYAPP_DATA_FILE=example.csv ./gradlew :server:run
+
+# command-line tag
+./gradlew :server:run --args="-P:heavyapp.dataFile=example.csv"
+
+# or edit heavyapp.dataFile in server/src/main/resources/application.conf
+```
+
+The refresh interval is configurable via `heavyapp.refreshSeconds` (default `60`).
 
 ## Building & Running
-
-To build or run the project, use one of the following tasks:
 
 | Task                      | Description       |
 |---------------------------|-------------------|
 | `./gradlew :server:test`  | Run the tests     |
-| `./gradlew :server:build` | Build the project |
+| `./gradlew build`         | Build everything  |
 | `./gradlew :server:run`   | Run the server    |
 
-If the server starts successfully, you'll see the following output:
+If the server starts successfully:
 
 ```
-2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
-2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
+2026-08-22 16:28:29.326 [main] INFO  Application - Loaded 5 workout(s) from example.csv
 ```
+
+## Deploying on a server
+
+The app ships as a self-contained fat JAR — only a **JRE/JDK 21 or newer** is
+required on the target machine.
+
+**1. Build the jar (on your machine):**
+
+```bash
+./gradlew :server:buildFatJar
+# → server/build/libs/server-all.jar
+```
+
+**2. Copy to the server and run:**
+
+```bash
+scp server/build/libs/server-all.jar deploy@myserver:/opt/heavyapp/
+
+ssh deploy@myserver
+HEAVYAPP_DATA_FILE=/opt/heavyapp/workouts.csv java -jar /opt/heavyapp/server-all.jar
+```
+
+**Configuration options (all optional except the data file):**
+
+| Setting | How | Default |
+|---|---|---|
+| CSV file path | `HEAVYAPP_DATA_FILE` env var, `-P:heavyapp.dataFile=…` CLI arg, or `application.conf` | unset (empty API) |
+| Refresh interval | `-P:heavyapp.refreshSeconds=120` CLI tag | `60` seconds |
+| HTTP port | `-P:ktor.deployment.port=9090` CLI tag | `8080` |
+
+```bash
+HEAVYAPP_DATA_FILE=/data/workouts.csv \
+java -jar server-all.jar -P:ktor.deployment.port=9090 -P:heavyapp.refreshSeconds=30
+```
+
+**Run as a systemd service** (`/etc/systemd/system/heavyapp.service`):
+
+```ini
+[Unit]
+Description=Hevy-compatible workout API
+After=network.target
+
+[Service]
+User=deploy
+WorkingDirectory=/opt/heavyapp
+Environment=HEAVYAPP_DATA_FILE=/opt/heavyapp/workouts.csv
+ExecStart=/usr/bin/java -jar /opt/heavyapp/server-all.jar
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable --now heavyapp
+journalctl -u heavyapp -f
+```
+
+Alternative packaging without a fat jar: `./gradlew :server:installDist` produces
+`server/build/install/` with launch scripts (`bin/server`) and all libraries —
+run it with `server/build/install/server/bin/server`.
+
+## Extending with new sources
+
+Each API domain is backed by an interface in `:core`
+(`dev.juanvega.source.WorkoutSource`, `RoutineSource`, …). The CSV loader is just
+one implementation of `WorkoutSource`; the currently unavailable domains respond
+`503` until their sources are implemented and wired in
+`Application.apiModule(...)`.

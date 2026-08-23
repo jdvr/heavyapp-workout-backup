@@ -1,0 +1,19 @@
+"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bench Press (Barbell)",0,"",0,"normal",20,14,,,
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bench Press (Barbell)",0,"",1,"normal",24,10,,,
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bent Over Row (Dumbbell)",1,"",0,"normal",16,8,,,
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bent Over Row (Dumbbell)",1,"",1,"normal",28,10,,,
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bicep Curl (Dumbbell)",1,"",0,"normal",20,10,,,
+"Push Day A","10 Aug 2026, 15:17","10 Aug 2026, 15:53","","Bicep Curl (Dumbbell)",1,"",1,"normal",20,12,,,
+"Core & Cardio","12 Aug 2026, 21:16","12 Aug 2026, 21:30","","Squat (Bodyweight)",,"",0,"normal",,10,,,
+"Core & Cardio","12 Aug 2026, 21:16","12 Aug 2026, 21:30","","Squat (Bodyweight)",,"",1,"normal",,8,,,
+"Core & Cardio","12 Aug 2026, 21:16","12 Aug 2026, 21:30","","Plank",,"",0,"normal",,,,25,
+"Core & Cardio","12 Aug 2026, 21:16","12 Aug 2026, 21:30","","Plank",,"",1,"normal",,,,40,
+"Treadmill Run","14 Aug 2026, 07:30","14 Aug 2026, 08:00","","Run (Treadmill)",,"Easy pace",0,"normal",,,5.2,1800,
+"Leg Day B","16 Aug 2026, 16:04","16 Aug 2026, 16:43","Focusing on depth this block","Lunge (Dumbbell)",,"",0,"normal",12,10,,,
+"Leg Day B","16 Aug 2026, 16:04","16 Aug 2026, 16:43","Focusing on depth this block","Lunge (Dumbbell)",,"",1,"normal",20,12,,,
+"Leg Day B","16 Aug 2026, 16:04","16 Aug 2026, 16:43","Focusing on depth this block","Romanian Deadlift (Dumbbell)",,"Slow eccentric",0,"normal",24,10,,,9.5
+"Leg Day B","16 Aug 2026, 16:04","16 Aug 2026, 16:43","Focusing on depth this block","Romanian Deadlift (Dumbbell)",,"Slow eccentric",1,"dropset",24,12,,,9.5
+"Upper Pull","18 Aug 2026, 09:42",,"No end time recorded","Lat Pulldown (Cable)",,"",0,"warmup",32,10,,,
+"Upper Pull","18 Aug 2026, 09:42",,"No end time recorded","Lat Pulldown (Cable)",,"",1,"normal",50,8,,,
+"Upper Pull","18 Aug 2026, 09:42",,"No end time recorded","Seated Cable Row - V Grip (Cable)",,"",0,"normal",45,10,,,

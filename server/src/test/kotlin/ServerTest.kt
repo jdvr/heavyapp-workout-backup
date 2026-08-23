@@ -9,11 +9,14 @@ class ServerTest {
 
     @Test
     fun `test root endpoint`() = testApplication {
+        environment {
+            config = io.ktor.server.config.MapApplicationConfig(
+                "heavyapp.dataFile" to "",
+            )
+        }
         application {
             rootModule()
         }
-        // verify server root returns 200
         assertEquals(HttpStatusCode.OK, client.get("/").status)
     }
-
 }
