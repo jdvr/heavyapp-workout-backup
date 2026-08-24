@@ -22,3 +22,5 @@ local.properties
 docs/
 server/docs/
 *swagger.json
+
+**/__pycache__/**
