@@ -1,4 +1,4 @@
-# AGENT.md — heavyapp-workout-parser
+# AGENT.md — heavyapp-workout-backup
 
 Guidance for AI agents (and humans) working in this repository.
 

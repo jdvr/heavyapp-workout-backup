@@ -26,7 +26,7 @@ fun Application.configureHttp() {
     }
     routing {
         get("/") {
-            call.respondText("heavyapp-workout-parser")
+            call.respondText("heavyapp-workout-backup")
         }
         openAPI(path = "openapi") {
             /*

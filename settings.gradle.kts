@@ -18,7 +18,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "heavyapp-workout-parser"
+rootProject.name = "heavyapp-workout-backup"
 
 include(":client")
 include(":core")

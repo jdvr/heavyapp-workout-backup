@@ -30,7 +30,7 @@ val ApiJson: Json = Json {
 }
 
 fun Application.rootModule() {
-    val openTelemetry = getOpenTelemetry(serviceName = "heavyapp-workout-parser")
+    val openTelemetry = getOpenTelemetry(serviceName = "heavyapp-workout-backup")
 
     configureOpenTelemetry(openTelemetry)
     configureStatusPages()

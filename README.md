@@ -1,4 +1,4 @@
-# heavyapp-workout-parser
+# heavyapp-workout-backup
 
 A Hevy-compatible workout API that serves data from a CSV export file.
 
@@ -61,7 +61,7 @@ If the server starts successfully:
 2026-08-22 16:28:29.326 [main] INFO  Application - Loaded 5 workout(s) from example.csv
 ```
 
-## Deploying on a server
+## Deploying on a server (FTP 🚀)
 
 The app ships as a self-contained fat JAR — only a **JRE/JDK 21 or newer** is
 required on the target machine.
@@ -129,3 +129,11 @@ Each API domain is backed by an interface in `:core`
 one implementation of `WorkoutSource`; the currently unavailable domains respond
 `503` until their sources are implemented and wired in
 `Application.apiModule(...)`.
+
+## License
+
+Licensed under the **GNU Affero General Public License v3.0** — see [LICENSE](LICENSE).
+
+> **Note:** this project implements a subset of the [Hevy API](https://api.hevyapp.com/docs/),
+> which was used as a starting point. It is not affiliated with or endorsed by
+> Hevy, and it does **not** aim to maintain feature parity with the official API.
