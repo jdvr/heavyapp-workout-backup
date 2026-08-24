@@ -21,6 +21,7 @@ no pagination:
 | `GET /v1/workouts/count` | 200 | Total workout count |
 | `GET /v1/workouts/{id}` | 200/404 | Single workout by ID |
 | `GET /v1/workouts/events?since=<ISO 8601>` | 200 | Workouts updated since the given timestamp (`updated` events only; deletions are never emitted) |
+| `POST /v1/workouts/import` | 200/400 | **Custom:** replaces the CSV source file. Body is the raw CSV; the current file is backed up as `<name>-<timestamp>-backup.csv` first, and the new data is served after the next refresh |
 | `GET /v1/exercise_history/{templateId}` | 200 | Set-level history for an exercise template, optional `start_date`/`end_date` |
 | `GET /v1/routines`, `/v1/routine_folders`, `/v1/exercise_templates`, `/v1/body_measurements`, `/v1/user/info` | **503** | Domains whose data sources are not wired yet |
 

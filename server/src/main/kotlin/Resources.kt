@@ -23,6 +23,14 @@ object Resources {
     @Resource("/v1/workouts/events")
     class WorkoutEvents(val since: Instant? = null)
 
+    /**
+     * Custom endpoint (not part of the Hevy API): replaces the CSV source file.
+     * The body is the raw CSV (`text/csv`); the previous file is backed up first.
+     */
+    @Serializable
+    @Resource("/v1/workouts/import")
+    class WorkoutImport
+
     @Serializable
     @Resource("/v1/workouts/{id}")
     class WorkoutById(val id: String)

@@ -5,6 +5,10 @@ import dev.juanvega.source.WorkoutSource
 import io.ktor.util.logging.Logger
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -115,4 +119,55 @@ class CsvWorkoutSource(
 
     override suspend fun workoutEvents(since: Instant): List<Workout> =
         current.filter { it.updated_at >= since }
+
+    /** Outcome of [importCsv]. */
+    sealed interface ImportResult {
+        /** CSV accepted and written; the background refresh picks it up. */
+        data class Success(val workoutCount: Int, val backupPath: Path?) : ImportResult
+
+        /** The uploaded content is not a valid workout CSV; nothing was modified. */
+        data class InvalidCsv(val reason: String) : ImportResult
+
+        /** The file could not be written; the previous file is untouched. */
+        data class Failure(val cause: Throwable) : ImportResult
+    }
+
+    /**
+     * Validates the uploaded CSV, backs up the current data file as
+     * `<name>-<UTC timestamp>-backup.csv`, and replaces it with the new content.
+     *
+     * The new data becomes visible with the next periodic refresh — no immediate
+     * reload is forced, keeping the refresh loop as the single writer of state.
+     */
+    fun importCsv(csvText: String): ImportResult {
+        val parsed = runCatching { WorkoutCsvReader.parse(csvText) }.getOrElse { error ->
+            return ImportResult.InvalidCsv(error.message ?: "invalid CSV")
+        }
+        val path = dataFile ?: return ImportResult.InvalidCsv("No heavyapp.dataFile configured")
+
+        return runCatching {
+            val backup = backupCurrent(path)
+            // Write to a temp file first so readers never see a partial CSV.
+            val temp = Files.createTempFile(path.toAbsolutePath().parent, "import", ".csv")
+            Files.writeString(temp, csvText)
+            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            log.info("Imported {} workout(s); previous file backed up to {}", parsed.size, backup ?: "(none)")
+            ImportResult.Success(workoutCount = parsed.size, backupPath = backup)
+        }.getOrElse { error ->
+            log.error("Failed to import CSV into {}; keeping previous file", path, error)
+            ImportResult.Failure(error)
+        }
+    }
+
+    private fun backupCurrent(path: Path): Path? {
+        if (!Files.exists(path)) return null
+        val name = path.fileName.toString()
+        val base = name.removeSuffix(".csv")
+        val stamp = LocalDateTime.now(ZoneOffset.UTC).format(BACKUP_STAMP)
+        val backup = path.resolveSibling("$base-$stamp-backup.csv")
+        Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING)
+        return backup
+    }
 }
+
+private val BACKUP_STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")

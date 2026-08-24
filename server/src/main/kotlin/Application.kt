@@ -1,6 +1,7 @@
 package dev.juanvega
 
 import dev.juanvega.config.AppSettings
+import dev.juanvega.routes.csvImportRoute
 import dev.juanvega.routes.metaRoutes
 import dev.juanvega.routes.workoutRoutes
 import dev.juanvega.source.BodyMeasurementSource
@@ -44,6 +45,7 @@ fun Application.rootModule() {
 
     apiModule(
         workouts = csvWorkouts,
+        csvSource = csvWorkouts,
         exerciseTemplates = UnavailableSources.exerciseTemplates(),
         routineFolders = UnavailableSources.routineFolders(),
         routines = UnavailableSources.routines(),
@@ -55,6 +57,7 @@ fun Application.rootModule() {
 /** Wires all `/v1` routes to their data sources; injectable for tests. */
 fun Application.apiModule(
     workouts: WorkoutSource,
+    csvSource: CsvWorkoutSource? = null,
     exerciseTemplates: ExerciseTemplateSource,
     routineFolders: RoutineFolderSource,
     routines: RoutineSource,
@@ -65,6 +68,7 @@ fun Application.apiModule(
     install(ResourcesPlugin)
     routing {
         workoutRoutes(workouts)
+        csvImportRoute(csvSource)
         metaRoutes(exerciseTemplates, routineFolders, routines, bodyMeasurements, userInfo)
     }
 }
