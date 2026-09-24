@@ -22,7 +22,7 @@ import kotlin.time.toKotlinInstant
 internal object WorkoutCsvReader {
 
     /** Column names as they appear in the export header. */
-    private enum class Column {
+    internal enum class Column {
         title, start_time, end_time, description, exercise_title, superset_id,
         exercise_notes, set_index, set_type, weight_kg, reps, distance_km,
         duration_seconds, rpe;
@@ -47,14 +47,37 @@ internal object WorkoutCsvReader {
 
     fun parse(csvText: String): List<Workout> = parse(CsvParser.parse(csvText))
 
-    fun parse(records: List<List<String>>): List<Workout> {
-        if (records.isEmpty()) return emptyList()
-
-        val header = records.first().map { it.trim() }
+    /**
+     * Column positions for a header row, validating that every required column is
+     * present. Shared with the import merge, which has to attribute raw rows to
+     * workouts without parsing them into [Workout]s first.
+     */
+    internal fun headerIndexes(headerRow: List<String>): Map<Column, Int> {
+        val header = headerRow.map { it.trim() }
         require(Column.entries.all { header.contains(it.name) }) {
             "CSV header is missing columns: ${Column.entries.map { it.name }.filterNot(header::contains)}"
         }
-        val indexOf = Column.entries.associateWith { header.indexOf(it.name) }
+        return Column.entries.associateWith { header.indexOf(it.name) }
+    }
+
+    /**
+     * Identity of the workout a data row belongs to: the same stable ID [parse]
+     * assigns the resulting [Workout]. `null` when the row has no usable
+     * `(title, start_time)` pair — the rows [parse] itself skips.
+     */
+    internal fun workoutIdOf(row: List<String>, indexOf: Map<Column, Int>): String? {
+        val title = row.getOrNull(indexOf.getValue(Column.title))?.trim().orEmpty()
+        if (title.isEmpty()) return null
+        val startTime = row.getOrNull(indexOf.getValue(Column.start_time))
+            ?.trim()
+            .orEmpty()
+            .parseTimestampOrNull() ?: return null
+        return stableId("workout", title, startTime.toString())
+    }
+
+    fun parse(records: List<List<String>>): List<Workout> {
+        if (records.isEmpty()) return emptyList()
+        val indexOf = headerIndexes(records.first())
 
         fun cells(rowCells: List<String>): ((Column) -> String) = { column ->
             rowCells.getOrNull(indexOf.getValue(column))?.trim().orEmpty()

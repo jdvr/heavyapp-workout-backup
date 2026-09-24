@@ -13,27 +13,44 @@ import kotlinx.serialization.Serializable
 @Serializable
 internal data class ImportResponse(
     val status: String,
+    /** Workouts the source file holds after the import. */
     val workouts: Int,
+    val added: Int,
+    val updated: Int,
+    val unchanged: Int,
+    val preserved: Int,
     val backup: String? = null,
 )
 
 /**
- * `POST /v1/workouts/import` — custom endpoint: replaces the CSV source file.
- * The request body is the raw CSV. The current file is backed up as
- * `<name>-<timestamp>-backup.csv` before being overwritten; the new data is
+ * `POST /v1/workouts/import` — custom endpoint: writes the uploaded CSV into the CSV
+ * source file. The request body is the raw CSV; the current file is backed up as
+ * `<name>-<timestamp>-backup.csv` before being overwritten, and the new data is
  * served after the next periodic refresh.
  *
- * Responds `503` while no CSV source is configured at all.
+ * `?mode=merge` (the default) keeps the workouts already stored that the upload does
+ * not mention — Hevy's export only covers a rolling window, so a plain re-import must
+ * not wipe older history. `?mode=replace` drops them and keeps only the upload.
+ *
+ * Responds `503` while no CSV source is configured at all, `400` for an unknown mode.
  */
 fun Route.csvImportRoute(csvSource: CsvWorkoutSource?) {
-    post<Resources.WorkoutImport> {
-        call.handleCsvImport(csvSource)
+    post<Resources.WorkoutImport> { resource ->
+        call.handleCsvImport(csvSource, resource.mode)
     }
 }
 
-private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?) {
+private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?, requestedMode: String?) {
     if (csvSource == null) {
         unavailable("CSV source")
+        return
+    }
+    val mode = requestedMode.toImportMode()
+    if (mode == null) {
+        respond(
+            HttpStatusCode.BadRequest,
+            ErrorResponse("Unknown mode '$requestedMode'; expected 'merge' (default) or 'replace'"),
+        )
         return
     }
     val csvText = receiveText()
@@ -41,10 +58,18 @@ private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?
         respond(HttpStatusCode.BadRequest, ErrorResponse("Request body must contain CSV data"))
         return
     }
-    when (val result = csvSource.importCsv(csvText)) {
+    when (val result = csvSource.importCsv(csvText, mode)) {
         is CsvWorkoutSource.ImportResult.Success -> respond(
             HttpStatusCode.OK,
-            ImportResponse(status = "imported", workouts = result.workoutCount, backup = result.backupPath?.toString()),
+            ImportResponse(
+                status = "imported",
+                workouts = result.workouts,
+                added = result.added,
+                updated = result.updated,
+                unchanged = result.unchanged,
+                preserved = result.preserved,
+                backup = result.backupPath?.toString(),
+            ),
         )
         is CsvWorkoutSource.ImportResult.InvalidCsv ->
             respond(HttpStatusCode.BadRequest, ErrorResponse(result.reason))
@@ -52,3 +77,16 @@ private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?
             respond(HttpStatusCode.InternalServerError, ErrorResponse("Failed to write CSV file"))
     }
 }
+
+/**
+ * Maps the `?mode=` query value onto an [CsvWorkoutSource.ImportMode]; `null` when it
+ * is not a known mode. Absent or blank means the default,
+ * [CsvWorkoutSource.ImportMode.Merge].
+ */
+private fun String?.toImportMode(): CsvWorkoutSource.ImportMode? =
+    when (this?.trim()?.lowercase()) {
+        null, "" -> CsvWorkoutSource.ImportMode.Merge
+        "merge" -> CsvWorkoutSource.ImportMode.Merge
+        "replace" -> CsvWorkoutSource.ImportMode.Replace
+        else -> null
+    }
