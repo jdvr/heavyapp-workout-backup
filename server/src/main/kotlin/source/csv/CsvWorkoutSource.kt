@@ -120,10 +120,23 @@ class CsvWorkoutSource(
     override suspend fun workoutEvents(since: Instant): List<Workout> =
         current.filter { it.updated_at >= since }
 
+    /** How [importCsv] treats the data already stored. */
+    enum class ImportMode {
+        Merge,
+        Replace,
+    }
+
     /** Outcome of [importCsv]. */
     sealed interface ImportResult {
         /** CSV accepted and written; the background refresh picks it up. */
-        data class Success(val workoutCount: Int, val backupPath: Path?) : ImportResult
+        data class Success(
+            val workouts: Int,
+            val added: Int,
+            val updated: Int,
+            val unchanged: Int,
+            val preserved: Int,
+            val backupPath: Path?,
+        ) : ImportResult
 
         /** The uploaded content is not a valid workout CSV; nothing was modified. */
         data class InvalidCsv(val reason: String) : ImportResult
@@ -134,29 +147,71 @@ class CsvWorkoutSource(
 
     /**
      * Validates the uploaded CSV, backs up the current data file as
-     * `<name>-<UTC timestamp>-backup.csv`, and replaces it with the new content.
+     * `<name>-<UTC timestamp>-backup.csv`, and writes the result back.
+     *
+     * In [ImportMode.Merge] (the default) the upload is merged into what is stored
+     * first — see [CsvImportMerger] — so older workouts survive an export that no
+     * longer contains them. In [ImportMode.Replace] the stored data is dropped.
      *
      * The new data becomes visible with the next periodic refresh — no immediate
      * reload is forced, keeping the refresh loop as the single writer of state.
      */
-    fun importCsv(csvText: String): ImportResult {
-        val parsed = runCatching { WorkoutCsvReader.parse(csvText) }.getOrElse { error ->
+    fun importCsv(csvText: String, mode: ImportMode = ImportMode.Merge): ImportResult {
+        val path = dataFile ?: return ImportResult.InvalidCsv("No heavyapp.dataFile configured")
+        val uploadedWorkouts = runCatching { WorkoutCsvReader.parse(csvText).size }.getOrElse { error ->
             return ImportResult.InvalidCsv(error.message ?: "invalid CSV")
         }
-        val path = dataFile ?: return ImportResult.InvalidCsv("No heavyapp.dataFile configured")
+        val uploaded = CsvParser.parse(csvText)
+        if (uploaded.isEmpty()) return ImportResult.InvalidCsv("CSV contains no records")
 
         return runCatching {
+            val merged = when (mode) {
+                ImportMode.Merge -> CsvImportMerger.merge(storedRecords(path), uploaded)
+                ImportMode.Replace -> null
+            }
+
             val backup = backupCurrent(path)
             // Write to a temp file first so readers never see a partial CSV.
             val temp = Files.createTempFile(path.toAbsolutePath().parent, "import", ".csv")
-            Files.writeString(temp, csvText)
+            Files.writeString(temp, CsvWriter.write(merged?.records ?: uploaded))
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            log.info("Imported {} workout(s); previous file backed up to {}", parsed.size, backup ?: "(none)")
-            ImportResult.Success(workoutCount = parsed.size, backupPath = backup)
+
+            val result = ImportResult.Success(
+                workouts = merged?.workoutCount ?: uploadedWorkouts,
+                added = merged?.added ?: uploadedWorkouts,
+                updated = merged?.updated ?: 0,
+                unchanged = merged?.unchanged ?: 0,
+                preserved = merged?.preserved ?: 0,
+                backupPath = backup,
+            )
+            log.info(
+                "Imported {} workout(s) in {} mode ({} added, {} updated, {} unchanged, {} preserved); previous file backed up to {}",
+                result.workouts,
+                mode,
+                result.added,
+                result.updated,
+                result.unchanged,
+                result.preserved,
+                backup ?: "(none)",
+            )
+            result
         }.getOrElse { error ->
             log.error("Failed to import CSV into {}; keeping previous file", path, error)
             ImportResult.Failure(error)
         }
+    }
+
+    private fun storedRecords(path: Path): List<List<String>>? {
+        if (!Files.exists(path)) return null
+        val records = runCatching { CsvParser.parse(Files.readString(path)) }.getOrElse { error ->
+            log.warn("Could not read {}; older workouts will not be preserved by this import", path, error)
+            return null
+        }
+        if (records.isEmpty()) return null
+        runCatching { WorkoutCsvReader.headerIndexes(records.first()) }.onFailure {
+            log.warn("{} is not a workout CSV; older workouts will not be preserved by this import", path)
+        }.getOrNull() ?: return null
+        return records
     }
 
     private fun backupCurrent(path: Path): Path? {

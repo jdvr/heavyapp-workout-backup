@@ -4,6 +4,7 @@ import dev.juanvega.source.csv.CsvWorkoutSource
 import io.ktor.util.logging.KtorSimpleLogger
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.*
 import kotlinx.coroutines.runBlocking
@@ -118,5 +119,101 @@ class CsvWorkoutSourceTest {
         assertTrue(source.isAvailable)
         assertFalse(source.loadNow())
         assertTrue(source.current.isEmpty())
+    }
+
+    // ---- incremental import ----
+
+    /** Same shape as [csvV1]; a workout the older export no longer covers. */
+    private val csvV2 = """
+        "title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+        "Fresh","23 Aug 2026, 10:00","23 Aug 2026, 10:30","","Squat (Barbell)",,"",0,"normal",60,5,,,
+    """.trimIndent()
+
+    @Test
+    fun `importCsv keeps stored workouts the upload does not mention`() {
+        val file = tempCsv(csvV1) // "Leg Day", 17 Aug 2026
+        val source = CsvWorkoutSource(file, log)
+        source.loadNow()
+
+        val result = source.importCsv(csvV2) as CsvWorkoutSource.ImportResult.Success
+
+        assertEquals(2, result.workouts)
+        assertEquals(1, result.added)
+        assertEquals(0, result.updated)
+        assertEquals(1, result.preserved)
+        assertNotNull(result.backupPath)
+
+        // Both workouts are in the file now, so the refresh serves two instead of one.
+        val written = file.readText()
+        assertTrue(written.contains("Leg Day"), written)
+        assertTrue(written.contains("Fresh"), written)
+        assertTrue(source.loadNow())
+        assertEquals(listOf("Fresh", "Leg Day"), source.current.map { it.title })
+        Files.deleteIfExists(file)
+    }
+
+    @Test
+    fun `re-importing the same export leaves the file byte-identical`() {
+        val file = tempCsv(csvV1)
+        val source = CsvWorkoutSource(file, log)
+        source.loadNow()
+        source.importCsv(csvV2)
+        val afterFirstImport = file.readText()
+
+        val result = source.importCsv(csvV2) as CsvWorkoutSource.ImportResult.Success
+
+        assertEquals(2, result.workouts)
+        assertEquals(0, result.added)
+        assertEquals(0, result.updated)
+        assertEquals(1, result.unchanged)
+        assertEquals(1, result.preserved)
+        assertEquals(afterFirstImport, file.readText())
+        Files.deleteIfExists(file)
+    }
+
+    @Test
+    fun `importCsv in Replace mode drops the stored workouts`() {
+        val file = tempCsv(csvV1)
+        val source = CsvWorkoutSource(file, log)
+        source.loadNow()
+
+        val result = source.importCsv(csvV2, CsvWorkoutSource.ImportMode.Replace)
+
+        assertIs<CsvWorkoutSource.ImportResult.Success>(result)
+        assertEquals(1, result.workouts)
+        assertEquals(1, result.added)
+        assertEquals(0, result.preserved)
+        assertFalse(file.readText().contains("Leg Day"))
+        source.loadNow()
+        assertEquals(listOf("Fresh"), source.current.map { it.title })
+        Files.deleteIfExists(file)
+    }
+
+    @Test
+    fun `importCsv replaces a stored file that is not a workout export`() {
+        val file = tempCsv("not,a,workout\n1,2,3")
+        val source = CsvWorkoutSource(file, log)
+        assertFalse(source.loadNow())
+
+        val result = source.importCsv(csvV2) as CsvWorkoutSource.ImportResult.Success
+
+        assertEquals(1, result.workouts)
+        assertEquals(1, result.added)
+        source.loadNow()
+        assertEquals(listOf("Fresh"), source.current.map { it.title })
+        Files.deleteIfExists(file)
+    }
+
+    @Test
+    fun `importCsv rejects content that is not a workout CSV`() {
+        val file = tempCsv(csvV1)
+        val source = CsvWorkoutSource(file, log)
+        source.loadNow()
+
+        val result = source.importCsv("this is not,csv at all")
+
+        assertIs<CsvWorkoutSource.ImportResult.InvalidCsv>(result)
+        assertEquals(csvV1, file.readText())
+        Files.deleteIfExists(file)
     }
 }
