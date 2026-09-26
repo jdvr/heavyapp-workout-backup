@@ -3,6 +3,7 @@ package dev.juanvega
 import dev.juanvega.config.AppSettings
 import dev.juanvega.routes.csvImportRoute
 import dev.juanvega.routes.metaRoutes
+import dev.juanvega.routes.skillRoute
 import dev.juanvega.routes.workoutRoutes
 import dev.juanvega.source.BodyMeasurementSource
 import dev.juanvega.source.ExerciseTemplateSource
@@ -67,6 +68,8 @@ fun Application.apiModule(
     install(ContentNegotiation) { json(ApiJson) }
     install(ResourcesPlugin)
     routing {
+        // Skill endpoint first so it can introspect the rest of the tree on demand
+        skillRoute(workouts, exerciseTemplates, routineFolders, routines, bodyMeasurements, userInfo)
         workoutRoutes(workouts)
         csvImportRoute(csvSource)
         metaRoutes(exerciseTemplates, routineFolders, routines, bodyMeasurements, userInfo)
