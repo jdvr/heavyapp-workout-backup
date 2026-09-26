@@ -24,12 +24,14 @@ object Resources {
     class WorkoutEvents(val since: Instant? = null)
 
     /**
-     * Custom endpoint (not part of the Hevy API): replaces the CSV source file.
-     * The body is the raw CSV (`text/csv`); the previous file is backed up first.
+     * Custom endpoint (not part of the Hevy API): imports a CSV export into the CSV
+     * source file. The body is the raw CSV (`text/csv`); the previous file is backed up
+     * first. `mode` is `merge` (default: keep stored workouts the upload omits) or
+     * `replace` (drop everything the upload does not contain).
      */
     @Serializable
     @Resource("/v1/workouts/import")
-    class WorkoutImport
+    class WorkoutImport(val mode: String? = null)
 
     @Serializable
     @Resource("/v1/workouts/{id}")
