@@ -43,18 +43,27 @@ internal data class ExerciseHistoryResponse(val exercise_history: List<ExerciseH
 fun Route.workoutRoutes(workouts: WorkoutSource) {
     get<Resources.Workouts> {
         call.respond(WorkoutsResponse(workouts.workouts()))
-    }
+    }.withSkillDescription(
+        summary = "List workouts",
+        description = "All workouts, newest first. Response: `{ workouts: Workout[] }`. No auth, no pagination. `Workout` fields: `id`, `title`, `description`, `start_time`/`end_time`/`updated_at`/`created_at` (ISO 8601), `exercises[]`.",
+    )
 
     get<Resources.WorkoutCount> {
         call.respond(WorkoutCountResponse(workout_count = workouts.workoutCount()))
-    }
+    }.withSkillDescription(
+        summary = "Workout count",
+        description = "Total workout count. Response: `{ workout_count: number }`.",
+    )
 
     get<Resources.WorkoutEvents> { resource ->
         // Deletions are never emitted; every event is an "updated" event.
         val events = workouts.workoutEvents(resource.since ?: Instant.DISTANT_PAST)
             .map { WorkoutEvent(WorkoutEventType.updated, it) }
         call.respond(WorkoutEventsResponse(events))
-    }
+    }.withSkillDescription(
+        summary = "Workout events",
+        description = "Workouts updated since `?since=<ISO 8601>` (e.g. `2026-08-17T15:17:00Z`). `since` optional — defaults to epoch. Only `updated` events are emitted; deletions never appear. Response: `{ events: { type: \"updated\", workout: Workout }[] }`.",
+    )
 
     get<Resources.WorkoutById> { resource ->
         val workout = workouts.workout(resource.id)
@@ -63,7 +72,10 @@ fun Route.workoutRoutes(workouts: WorkoutSource) {
             return@get
         }
         call.respond(workout)
-    }
+    }.withSkillDescription(
+        summary = "Get workout by ID",
+        description = "Single workout by ID. `200` with `Workout` or `404` `{ error }`.",
+    )
 
     // Derivable today thanks to deterministic template IDs; will switch to the
     // dedicated exercise-template source once that domain is wired.
@@ -97,5 +109,8 @@ fun Route.workoutRoutes(workouts: WorkoutSource) {
             .sortedByDescending { it.workout_start_time }
             .toList()
         call.respond(ExerciseHistoryResponse(entries))
-    }
+    }.withSkillDescription(
+        summary = "Exercise history",
+        description = "Set-level history for an exercise template. Path param `exerciseTemplateId` is deterministic (from CSV). Optional query params `start_date` / `end_date` (ISO 8601) filter by `workout_start_time`. Derived from workouts. Response: `{ exercise_history: ExerciseHistoryEntry[] }` sorted desc by `workout_start_time`. Each entry has `workout_id`, `workout_title`, `workout_start_time`/`workout_end_time`, `exercise_template_id`, `weight_kg`, `reps`, `distance_meters`, `duration_seconds`, `rpe`, `custom_metric`, `set_type`.",
+    )
 }

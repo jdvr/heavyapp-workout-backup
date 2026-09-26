@@ -36,7 +36,10 @@ internal data class ImportResponse(
 fun Route.csvImportRoute(csvSource: CsvWorkoutSource?) {
     post<Resources.WorkoutImport> { resource ->
         call.handleCsvImport(csvSource, resource.mode)
-    }
+    }.withSkillDescription(
+        summary = "Import CSV",
+        description = "Custom (not in Hevy API): replaces the CSV source. Request body is raw `text/csv`; `Content-Type: text/csv`. Previous file backed up as `<name>-<timestamp>-backup.csv`. New data visible after next refresh (`heavyapp.refreshSeconds`, default 60s). `200 { status, workouts, backup }`, `400` on blank/invalid CSV, `503` if no CSV source configured.",
+    )
 }
 
 private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?, requestedMode: String?) {

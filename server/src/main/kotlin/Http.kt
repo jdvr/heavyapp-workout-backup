@@ -1,5 +1,6 @@
 package dev.juanvega
 
+import dev.juanvega.routes.withSkillDescription
 import io.ktor.server.application.*
 import io.ktor.http.*
 import io.ktor.server.plugins.cors.routing.*
@@ -27,7 +28,10 @@ fun Application.configureHttp() {
     routing {
         get("/") {
             call.respondText("heavyapp-workout-backup")
-        }
+        }.withSkillDescription(
+            summary = "Health check",
+            description = "Health check — returns plain text `heavyapp-workout-backup`.",
+        )
         openAPI(path = "openapi") {
             /*
              Documentation source configuration goes here.
