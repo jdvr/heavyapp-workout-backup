@@ -4,7 +4,6 @@ import dev.juanvega.source.csv.CsvParser
 import dev.juanvega.source.csv.CsvWriter
 import kotlin.test.*
 
-/** Serialization round-trip of [CsvWriter] through [CsvParser]. */
 class CsvWriterTest {
 
     @Test

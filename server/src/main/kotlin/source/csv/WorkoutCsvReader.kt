@@ -49,7 +49,7 @@ internal object WorkoutCsvReader {
 
     /**
      * Column positions for a header row, validating that every required column is
-     * present. Shared with the import merge, which has to attribute raw rows to
+     * present. Exposed to the import merge, which has to attribute raw rows to
      * workouts without parsing them into [Workout]s first.
      */
     internal fun headerIndexes(headerRow: List<String>): Map<Column, Int> {

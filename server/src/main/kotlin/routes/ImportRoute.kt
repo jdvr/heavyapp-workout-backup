@@ -13,7 +13,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 internal data class ImportResponse(
     val status: String,
-    /** Workouts the source file holds after the import. */
     val workouts: Int,
     val added: Int,
     val updated: Int,
@@ -78,11 +77,6 @@ private suspend fun ApplicationCall.handleCsvImport(csvSource: CsvWorkoutSource?
     }
 }
 
-/**
- * Maps the `?mode=` query value onto an [CsvWorkoutSource.ImportMode]; `null` when it
- * is not a known mode. Absent or blank means the default,
- * [CsvWorkoutSource.ImportMode.Merge].
- */
 private fun String?.toImportMode(): CsvWorkoutSource.ImportMode? =
     when (this?.trim()?.lowercase()) {
         null, "" -> CsvWorkoutSource.ImportMode.Merge

@@ -1,41 +1,21 @@
 package dev.juanvega.source.csv
 
 /**
- * Merges an uploaded Hevy export into the CSV already stored.
- *
- * Hevy's export only covers a rolling window (roughly the last three months), so
- * [CsvWorkoutSource] replacing the stored file outright would drop every older
- * workout. This merge keeps the stored workouts the upload does not mention, and lets
- * the uploaded rows win for the workouts it does mention (they are the fresher copy),
- * so re-importing a fresh export never loses history.
- *
- * Workouts are matched by the stable ID derived from `(title, start_time)` — the same
- * identity [WorkoutCsvReader] gives the API. All rows of a workout are replaced
- * together, so an updated workout can never leave orphan sets behind.
+ * Merges an uploaded Hevy export into the CSV already stored. Workouts are matched by
+ * the stable ID [WorkoutCsvReader] gives the API, and all rows of a workout are
+ * replaced together, so an updated workout can never leave orphan sets behind.
  */
 internal object CsvImportMerger {
 
-    /** What a merge did, for logging and the import response. */
     internal data class Outcome(
-        /** Records of the merged file: the upload's header, then every workout. */
         val records: List<List<String>>,
-        /** Workouts of the upload that were not stored yet. */
         val added: Int,
-        /** Stored workouts whose uploaded rows differ — the upload won. */
         val updated: Int,
-        /** Stored workouts the upload repeats unchanged. */
         val unchanged: Int,
-        /** Stored workouts the upload does not mention, kept as they were. */
         val preserved: Int,
-        /** Distinct workouts in [records]. */
         val workoutCount: Int,
     )
 
-    /**
-     * @param storedRecords records of the stored CSV, or `null` when there is nothing to
-     *   merge into (no file yet). `[records].first()` is a header.
-     * @param uploadedRecords records of the uploaded CSV; `first()` is the header.
-     */
     fun merge(storedRecords: List<List<String>>?, uploadedRecords: List<List<String>>): Outcome {
         require(uploadedRecords.isNotEmpty()) { "uploaded CSV must contain a header" }
         val header = uploadedRecords.first()
@@ -69,8 +49,8 @@ internal object CsvImportMerger {
             records = buildList {
                 add(header)
                 merged.values.forEach(::addAll)
-                // Rows without a usable identity belong to no workout; they are kept
-                // verbatim rather than silently dropped.
+                // Rows without a usable identity belong to no workout; kept verbatim
+                // rather than silently dropped.
                 stored?.let { addAll(it.unkeyable) }
             },
             added = added,
@@ -81,7 +61,6 @@ internal object CsvImportMerger {
         )
     }
 
-    /** Data rows grouped by the workout they belong to, plus the rows that map to none. */
     private class Groups(
         val header: List<String>,
         val byWorkout: Map<String, List<List<String>>>,

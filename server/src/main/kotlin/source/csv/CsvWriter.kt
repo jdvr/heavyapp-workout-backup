@@ -14,7 +14,6 @@ internal object CsvWriter {
     private const val RECORD_SEPARATOR = '\n'
     private const val QUOTE = '"'
 
-    /** Writes [records] as CSV text; an empty list yields an empty string. */
     fun write(records: List<List<String>>): String =
         records.joinToString(RECORD_SEPARATOR.toString()) { record ->
             record.joinToString(FIELD_SEPARATOR.toString()) { field -> field.quoted() }

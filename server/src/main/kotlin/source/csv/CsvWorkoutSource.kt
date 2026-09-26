@@ -122,26 +122,13 @@ class CsvWorkoutSource(
 
     /** How [importCsv] treats the data already stored. */
     enum class ImportMode {
-        /**
-         * Keep the stored workouts the upload does not mention (default). Hevy's export
-         * only covers a rolling window (~3 months), so this is what stops a routine
-         * re-import from wiping older history.
-         */
         Merge,
-
-        /** Drop the stored data and keep only the upload. */
         Replace,
     }
 
     /** Outcome of [importCsv]. */
     sealed interface ImportResult {
-        /**
-         * CSV accepted and written; the background refresh picks it up.
-         *
-         * [workouts] is how many workouts the file holds after the import: [added],
-         * [updated] and [unchanged] come from the upload, while [preserved] are stored
-         * workouts it did not mention.
-         */
+        /** CSV accepted and written; the background refresh picks it up. */
         data class Success(
             val workouts: Int,
             val added: Int,
@@ -214,11 +201,6 @@ class CsvWorkoutSource(
         }
     }
 
-    /**
-     * Records of the stored CSV, or `null` when there is nothing to merge into: no file
-     * yet, an empty one, or one that is not a workout export. Both failures are logged;
-     * the import still goes through, it just has nothing to preserve.
-     */
     private fun storedRecords(path: Path): List<List<String>>? {
         if (!Files.exists(path)) return null
         val records = runCatching { CsvParser.parse(Files.readString(path)) }.getOrElse { error ->
